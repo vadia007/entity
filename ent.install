@@ -1,0 +1,28 @@
+<?php
+function ent_schema() {
+    $schema['entity'] = array(
+        'fields' => array(
+            'eid' => array(
+                'description' => 'Entity ID',
+                'type' => 'serial',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
+            'title' => array(
+                'description' => 'Entity title',
+                'type' => 'varchar',
+                'length' => 100,
+                'not null' => TRUE,
+            ),
+            'text' => array(
+                'description' => 'Some text',
+                'type' => 'varchar',
+                'length' => 50,
+                'not null' => TRUE,
+            ),
+        ) + entity_exportable_schema_fields(),
+        'primary key' => array('eid'),
+    );
+
+    return $schema;
+}
