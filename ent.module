@@ -1,32 +1,36 @@
 <?php
+
 function ent_entity_info() {
-    return array(
+    $return = array(
         'ent' => array(
             'label' => t('Entity'),
             'entity class' => 'Entity',
-            'controller class' => 'EntityAPIControllerExportable',
+            'controller class' => 'EntityAPIController',
             'base table' => 'entity',
+            'uri callback' => 'ent_info_uri',
             'fieldable' => TRUE,
             'exportable' => TRUE,
-            'entity keys' => array(
-                'id' => 'eid',
-                'label' => 'title'
-            ),
             'admin ui' => array(
                 'path' => 'admin/structure/entitys'
             ),
             'access callback' => 'ent_access',
             'module' => 'ent',
-
+            'entity keys' => array(
+                'id' => 'eid',
+                'label' => 'title',
+                'bundles' => 'type',
+            ),
             'bundles' => array(
                 'ent' => array(
                     'label' => t('Entity'),
                     'admin' => array(
                         'path' => 'admin/structure/entitys',
-                        'access arguments' => array('administer entity'),
+                        'access arguments' => array('administer entitys'),
                     ),
                 ),
             ),
+
+
             'view modes' => array(
                 'full' => array(
                     'label' => t('Full content'),
@@ -40,73 +44,10 @@ function ent_entity_info() {
                     'label' => t('RSS'),
                     'custom settings' => FALSE,
                 ),
-            ),
-        ),
-
-    );
-}
-
-
-function ent_access($op, $entity, $account = NULL, $entity_type = 'ent') {
-    return user_access('administer site configuration');
-}
-
-
-function ent_load($eid) {
-    $result = entity_load('ent', array($eid));
-    return $result ? reset($result) : FALSE;
-}
-
-
-function ent_form($form, &$form_state, $entity, $op = 'edit') {
-    $form['title'] = array(
-        '#title' => 'Название',
-        '#description' => 'Название сущности',
-        '#type' => 'textfield',
-        '#default_value' => isset($entity->title) ? $entity->title : '',
-        '#required' => true,
-    );
-
-    $form['text'] = array(
-        '#title' => 'Текст',
-        '#description' => 'Текст',
-        '#type' => 'textfield',
-        '#default_value' => isset($entity->text) ? $entity->text : '',
-        '#required' => true,
-        '#size' => 20,
-    );
-
-    $form['actions'] = array(
-        '#type' => 'actions',
-    );
-
-    $form['actions']['submit'] = array(
-        '#type' => 'submit',
-        '#value' => 'Сохранить',
-    );
-
-    return $form;
-}
-
-function ent_form_submit(&$form, &$form_state) {
-    $entity = entity_ui_form_submit_build_entity($form, $form_state);
-    $entity->save();
-    $form_state['redirect'] = 'admin/structure/entitys';
-}
-
-function ent_field_extra_fields() {
-    $return = array();
-    $return['etn']['ent'] = array(
-        'form' => array(
-            'title' => array(
-                'label' => t('Title'),
-                'description' => t('Example entity module title form element'),
-                'weight' => -10,
-            ),
-            'text' => array(
-                'label' => t('Text'),
-                'weight' => -9,
-
+                'new' => array(
+                    'label' => t('New'),
+                    'custom settings' => TRUE,
+                ),
             ),
         ),
 
@@ -114,32 +55,157 @@ function ent_field_extra_fields() {
 
     return $return;
 }
-function ent_entity_info_alter(&$entity_info)
-{
-    $entity_info['ent']['view modes']['new'] = array
-    (
-        'label' => t('New'),
-        'custom settings' => TRUE,
+
+function ent_permission() {
+    return array(
+        'administer entitys' =>  array(
+            'title' => t('Administer entitys')
+        ),
     );
+}
+
+
+function ent_access($op, $entity, $account = NULL, $entity_type = 'ent') {
+
+    return user_access('administer entitys');
+}
+
+
+function ent_load($basic_id = NULL, $reset = FALSE) {
+    $basic_ids = (isset($basic_id) ? array($basic_id) : array());
+    $basic = ent_load_multiple($basic_ids, array(), $reset);
+    return $basic ? reset($basic) : FALSE;
+}
+
+function ent_load_multiple($basic_ids = FALSE, $conditions = array(), $reset = FALSE) {
+    return entity_load('ent', $basic_ids, $conditions, $reset);
+}
+
+function ent_form($form, &$form_state, $edit) {
+    if (!isset($edit)) {
+        $edit = (object) array(
+            'title' => '',
+            'text' => '',
+            'published' => 0,
+        );
+    }
+    $form['title'] = array(
+        '#title' => 'Название',
+        '#description' => 'Название сущности',
+        '#type' => 'textfield',
+        '#default_value' => isset($edit->title) ? $edit->title : '',
+        '#required' => true,
+    );
+
+    $form['text'] = array(
+        '#title' => 'Текст',
+        '#description' => 'Текст',
+        '#type' => 'textfield',
+        '#default_value' => isset($edit->text) ? $edit->text : '',
+        '#required' => true,
+        '#size' => 20,
+    );
+    $form['published'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Published'),
+        '#default_value' => isset($edit->published) ? $edit->published : 0,
+    );
+
+    field_attach_form('ent', (object) $edit, $form, $form_state);
+
+    if (!empty($edit->eid)) {
+        $form['eid'] = array(
+            '#type' => 'value',
+            '#value' => $edit->eid,
+        );
+    }
+    $form['actions'] = array('#type' => 'actions');
+    $form['actions']['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Save'),
+        '#weight' => 5,
+    );
+
+    return $form;
+}
+
+function ent_page_admin() {
+    $build = drupal_get_form('ent_form');
+    return $build;
+}
+
+function ent_form_submit($form, &$form_state) {
+    $edit = (object) $form_state['values'];
+    field_attach_submit('ent', $edit, $form, $form_state);
+    ent_save($edit);
+    $form_state['redirect'] = "admin/structure/entitys";
+}
+
+function ent_field_extra_fields() {
+    $return = array();
+    $return['ent']['ent'] = array(
+        'form' => array(
+            'title' => array(
+                'label' => t('Title'),
+                'description' => t('Entity module title form element'),
+                'weight' => -10,
+            ),
+            'text' => array(
+                'label' => t('Text'),
+                'weight' => -9,
+
+            ),
+            'published' => array(
+                'label' => t('Published'),
+                'weight' => -8,
+            ),
+        ),
+
+    );
+    return $return;
+}
+function ent_save(&$edit) {
+    field_attach_presave('ent', $edit);
+    if (!empty($edit->eid)) {
+        drupal_write_record('entity', $edit, 'eid');
+        field_attach_update('ent', $edit);
+        module_invoke_all('entity_update', 'ent', $edit);
+        return $edit;
+    }
+    drupal_write_record('entity', $edit);
+    field_attach_insert('ent', $edit);
+    module_invoke_all('entity_insert', 'ent', $edit);
+    return $edit;
 }
 
 function ent_menu() {
     $items['entity'] = array(
         'title' =>'Entity',
-        'page callback' => 'entity_v',
+        'page callback' => 'view_callback',
         'access callback' => TRUE,
         'type' => MENU_NORMAL_ITEM,
         'menu_name' => 'main-menu',
     );
+    $items['admin/structure/entitys'] = array(
+        'title' => 'Entities',
+        'description' => 'Manage entities on your site.',
+        'access arguments' => array('administer entity'),
+        'page callback' => 'ent_page_admin',
+        'page arguments' => array('add'),
+        'weight' => -10,
+    );
+
     return $items;
 }
 
-function entity_v(){
+
+function view_callback(){
     $query = db_select('entity', 'e')
         ->fields('e', array('eid', 'title','text'))
+        ->condition('e.published', 1)
         ->orderBy('eid', 'DESC');
-        $result = $query->execute();
-        $output = array();
+    $result = $query->execute();
+    $output = array();
     foreach ($result as $rows) {
         $output[] = array($rows->eid, $rows->title, $rows->text);
     }
@@ -153,3 +219,40 @@ function ent_theme() {
         )
     );
 }
+function ent_info_uri($entity) {
+    return array(
+        'path' => 'entitys/' . $entity->eid,
+    );
+}
+
+/*class EntityExampleBasicController
+        extends DrupalDefaultEntityController
+        implements EntityExampleBasicControllerInterface {
+
+    public function delete($entity) {
+        $this->delete_multiple(array($entity));
+    }
+    public function delete_multiple($entities) {
+        $eids = array();
+        if (!empty($entities)) {
+            $transaction = db_transaction();
+            try {
+                foreach ($entities as $entity) {
+// Invoke hook_entity_delete().
+                    module_invoke_all('entity_delete', $entity, 'ent');
+                    field_attach_delete('ent', $entity);
+                    $eids[] = $entity->eid;
+                }
+                db_delete('entity')
+                    ->condition('eid', $eids, 'IN')
+                    ->execute();
+            }
+            catch (Exception $e) {
+                $transaction->rollback();
+                watchdog_exception('ent', $e);
+                throw $e;
+            }
+        }
+    }
+}*/
+

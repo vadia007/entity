@@ -20,6 +20,12 @@ function ent_schema() {
                 'length' => 50,
                 'not null' => TRUE,
             ),
+            'published' => array(
+                'description' => 'Published',
+                'type' => 'int',
+                'unsigned' => TRUE,
+                'not null' => TRUE,
+            ),
         ) + entity_exportable_schema_fields(),
         'primary key' => array('eid'),
     );
